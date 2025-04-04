@@ -60,13 +60,43 @@ class Algorithm():
 
 
         QUACK = "Quantum Universal Algorithmic Currency Koin"
+        RW = "Rare Watch"
 
         # QUACK
-        # stock - historically more likely to go up
-        if self.data[QUACK][self.day] <= 2.2 or (self.day >= 2 and self.data[QUACK][-2] > self.data[QUACK][-1]):
+        # buy - historically more likely to go up
+        if self.data[QUACK][-1] <= 2.2 or (self.day >= 2 and self.data[QUACK][-2] > self.data[QUACK][-1]):
             desiredPositions[QUACK] = positionLimits[QUACK]
         else: # short
              desiredPositions[QUACK] = -positionLimits[QUACK]
+
+
+        # RW
+        pattern, _ = self.rw_helper(self.data[RW])
+
+        # down slope - short
+        if self.day >= 2 and self.data[RW][-2] > self.data[RW][-1]:
+            desiredPositions[RW] = -positionLimits[RW]
+        else: # up slope - buy
+             desiredPositions[RW] = positionLimits[RW]
+
+        # # THIS IS SHIT :/
+        # # sattle - buy
+        # if pattern == "potential_peak":
+        #     desiredPositions[RW] = positionLimits[RW]
+
+        # # peak - short
+        # if pattern == "potential_peak":
+        #     desiredPositions[RW] = -positionLimits[RW]
+
+        # sudden drop - buy
+        if pattern == "sudden_drop":
+            desiredPositions[RW] = positionLimits[RW]
+
+        # sudden rise - short
+        if pattern == "sudden_rise":
+            desiredPositions[RW] = -positionLimits[RW]
+
+
 
 
         # Display the end of trading day
@@ -74,3 +104,42 @@ class Algorithm():
         #######################################################################
         # Return the desired positions
         return desiredPositions
+
+
+    def rw_helper(self, prices, window_size=5, threshold=4):
+        if len(prices) < window_size + 1:
+            return None, 0  # Not enough data
+
+        window = prices[-(window_size+1):-1]
+
+        pattern = None
+        confidence = 0
+
+
+        if len(window) >= 3:
+            # potential peak (price has been rising and now shows signs of reversal)
+            trend = [prices[-i-1] < prices[-i] for i in range(1, 4)]
+            if all(trend[:-1]) and not trend[-1]:
+                # The price was rising but has started to decrease
+                pattern = "potential_peak"
+                confidence = (prices[-1] - min(window)) / min(window)
+
+            # potential saddle (price has been falling and now shows signs of reversal)
+            trend = [prices[-i-1] > prices[-i] for i in range(1, 4)]
+            if all(trend[:-1]) and not trend[-1]:
+                # The price was falling but has started to increase
+                pattern = "potential_saddle"
+                confidence = (max(window) - prices[-1]) / prices[-1]
+
+        # sudden drop/ rise
+        if len(prices) >= 2:
+            if prices[-2] > 0:  # Avoid division by zero
+                Δ = ((prices[-1] - prices[-2]) / prices[-2]) * 100
+                if Δ < -threshold:
+                    pattern = "sudden_drop"
+                    confidence = abs(Δ) / threshold
+                if Δ > threshold:
+                    pattern = "sudden_rise"
+                    confidence = abs(Δ) / threshold
+
+        return pattern, confidence
