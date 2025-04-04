@@ -62,11 +62,11 @@ class Algorithm():
         QUACK = "Quantum Universal Algorithmic Currency Koin"
 
         # QUACK
-        # short
-        if self.data[QUACK][self.day] > 2.2:
-            desiredPositions[QUACK] = -positionLimits[QUACK]
-        else: # stock - historically more likely to go up
+        # stock - historically more likely to go up
+        if self.data[QUACK][self.day] <= 2.2 or (self.day >= 2 and self.data[QUACK][-2] > self.data[QUACK][-1]):
             desiredPositions[QUACK] = positionLimits[QUACK]
+        else: # short
+             desiredPositions[QUACK] = -positionLimits[QUACK]
 
 
         # Display the end of trading day
