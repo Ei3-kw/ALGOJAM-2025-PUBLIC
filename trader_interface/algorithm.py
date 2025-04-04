@@ -1,5 +1,16 @@
 import numpy as np
 
+FT = "Fintech Token"
+PE = "Purple Elixir"
+QUACK = "Quantum Universal Algorithmic Currency Koin"
+DF = "Dawg Food"
+UD = "UQ Dollar"
+FC = "Fried Chicken"
+SS = "Secret Spices"
+GE = "Goober Eats"
+RC = "Raw Chicken"
+RW = "Rare Watch"
+
 # Custom trading Algorithm
 class Algorithm():
 
@@ -42,7 +53,7 @@ class Algorithm():
         # Display the current trading day
         print("Starting Algorithm for Day:", self.day)
         
-        trade_instruments = list(positionLimits.keys())
+        trade_instruments = self.positionLimits.keys()
 
         # Display the prices of instruments I want to trade
         for ins in trade_instruments:
@@ -51,21 +62,23 @@ class Algorithm():
 
         # BENCH MARK -- 1409403
 
-        # # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
-        # if self.day >= 2:
-        #     for ins in trade_instruments:
-        #         # if price has gone down buy
-        #         if self.data[ins][-2] > self.data[ins][-1]:
-        #             desiredPositions[ins] = positionLimits[ins]
-        #         else:
-        #             desiredPositions[ins] = -positionLimits[ins]
+        # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
+        if self.day >= 2:
+            for ins in trade_instruments:
+                # if price has gone down buy
+                if self.data[ins][-2] > self.data[ins][-1]:
+                    desiredPositions[ins] = positionLimits[ins]
+                else:
+                    desiredPositions[ins] = -positionLimits[ins]
 
         # BENCH MARK 2
-        ema_period = 7  # EMA lookback period - TODO adjust for different instruments
+        trade_instruments = [PE, UD]
+        ema_periods = {PE:10, UD:12}  # EMA lookback period - TODO adjust for different instruments
 
         # We need enough data to calculate EMA
-        if self.day >= ema_period:
-            for ins in trade_instruments:
+        for ins in trade_instruments:
+            ema_period = ema_periods[ins]
+            if self.day >= ema_period:
                 current_price = self.data[ins][-1]
                 prices = self.data[ins][-ema_period:]
                 ema = self.calculate_ema(prices, ema_period)
@@ -76,19 +89,17 @@ class Algorithm():
                 else:  # Price above EMA - potential sell signal
                     desiredPositions[ins] = -positionLimits[ins]
 
-        # For early days when we don't have enough data for EMA
-        elif self.day >= 2:
-            for ins in trade_instruments:
-                # Fallback to simple price comparison strategy
-                if self.data[ins][-2] > self.data[ins][-1]:  # if price has gone down buy
-                    desiredPositions[ins] = positionLimits[ins]
-                else:
-                    desiredPositions[ins] = -positionLimits[ins]
+            # For early days when we don't have enough data for EMA
+            elif self.day >= 2:
+                for ins in trade_instruments:
+                    # Fallback to simple price comparison strategy
+                    if self.data[ins][-2] > self.data[ins][-1]:  # if price has gone down buy
+                        desiredPositions[ins] = positionLimits[ins]
+                    else:
+                        desiredPositions[ins] = -positionLimits[ins]
 
 
-        QUACK = "Quantum Universal Algorithmic Currency Koin"
-        RW = "Rare Watch"
-        PE = "Purple Elixir"
+
         # QUACK
         # buy when less than avg - historically more likely to go up OR if price dropped
         if self.data[QUACK][-1] <= 2.2 or (self.day >= 2 and self.data[QUACK][-2] > self.data[QUACK][-1]):
@@ -121,13 +132,6 @@ class Algorithm():
         # sudden rise - short
         if pattern == "sudden_rise":
             desiredPositions[RW] = -positionLimits[RW]
-
-        # # PE
-        # # buy when less than avg - historically more likely to go up OR if price dropped
-        # if self.data[PE][-1] <= 8.5 or (self.day >= 2 and self.data[PE][-2] > self.data[PE][-1]):
-        #     desiredPositions[PE] = positionLimits[PE]
-        # else: # short
-        #      desiredPositions[PE] = -positionLimits[PE]
 
 
 
