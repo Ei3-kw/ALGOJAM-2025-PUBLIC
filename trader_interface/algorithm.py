@@ -42,26 +42,35 @@ class Algorithm():
         # Display the current trading day
         print("Starting Algorithm for Day:", self.day)
         
-        # I only want to trade the UQ Dollar
-        trade_instruments = ["UQ Dollar"]
+        # BENCH MARK -- 1409403
+        # trade_instruments = list(positionLimits.keys())
         
-        # Display the prices of instruments I want to trade
-        for ins in trade_instruments:
-            print(f"{ins}: ${self.get_current_price(ins)}")
+        # # Display the prices of instruments I want to trade
+        # for ins in trade_instruments:
+        #     print(f"{ins}: ${self.get_current_price(ins)}")
         
-        # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
-        if self.day >= 2:
-            for ins in trade_instruments:
-                # if price has gone down buy
-                if self.data[ins][-2] > self.data[ins][-1]:
-                    desiredPositions[ins] = positionLimits[ins]
-                    desiredPositions[ins] = 0
-                else:
-                    desiredPositions[ins] = -positionLimits[ins]
+        # # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
+        # if self.day >= 2:
+        #     for ins in trade_instruments:
+        #         # if price has gone down buy
+        #         if self.data[ins][-2] > self.data[ins][-1]:
+        #             desiredPositions[ins] = positionLimits[ins]
+        #         else:
+        #             desiredPositions[ins] = -positionLimits[ins]
+
+
+        QUACK = "Quantum Universal Algorithmic Currency Koin"
+
+        # QUACK
+        # short
+        if self.data[QUACK][self.day] > 2.2:
+            desiredPositions[QUACK] = -positionLimits[QUACK]
+        else: # stock - historically more likely to go up
+            desiredPositions[QUACK] = positionLimits[QUACK]
+
+
         # Display the end of trading day
         print("Ending Algorithm for Day:", self.day, "\n")
-        
-
         #######################################################################
         # Return the desired positions
         return desiredPositions
