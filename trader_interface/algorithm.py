@@ -42,13 +42,15 @@ class Algorithm():
         # Display the current trading day
         print("Starting Algorithm for Day:", self.day)
         
+        trade_instruments = list(positionLimits.keys())
+
+        # Display the prices of instruments I want to trade
+        for ins in trade_instruments:
+            print(f"{ins}: ${self.get_current_price(ins)}")
+
+
         # BENCH MARK -- 1409403
-        # trade_instruments = list(positionLimits.keys())
-        
-        # # Display the prices of instruments I want to trade
-        # for ins in trade_instruments:
-        #     print(f"{ins}: ${self.get_current_price(ins)}")
-        
+
         # # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
         # if self.day >= 2:
         #     for ins in trade_instruments:
@@ -58,17 +60,41 @@ class Algorithm():
         #         else:
         #             desiredPositions[ins] = -positionLimits[ins]
 
+        # BENCH MARK 2
+        ema_period = 7  # EMA lookback period - TODO adjust for different instruments
+
+        # We need enough data to calculate EMA
+        if self.day >= ema_period:
+            for ins in trade_instruments:
+                current_price = self.data[ins][-1]
+                prices = self.data[ins][-ema_period:]
+                ema = self.calculate_ema(prices, ema_period)
+
+                # Decision logic based on price vs EMA relationship
+                if current_price < ema:  # Price below EMA - potential buy signal
+                    desiredPositions[ins] = positionLimits[ins]
+                else:  # Price above EMA - potential sell signal
+                    desiredPositions[ins] = -positionLimits[ins]
+
+        # For early days when we don't have enough data for EMA
+        elif self.day >= 2:
+            for ins in trade_instruments:
+                # Fallback to simple price comparison strategy
+                if self.data[ins][-2] > self.data[ins][-1]:  # if price has gone down buy
+                    desiredPositions[ins] = positionLimits[ins]
+                else:
+                    desiredPositions[ins] = -positionLimits[ins]
+
 
         QUACK = "Quantum Universal Algorithmic Currency Koin"
         RW = "Rare Watch"
-
+        PE = "Purple Elixir"
         # QUACK
-        # buy - historically more likely to go up
+        # buy when less than avg - historically more likely to go up OR if price dropped
         if self.data[QUACK][-1] <= 2.2 or (self.day >= 2 and self.data[QUACK][-2] > self.data[QUACK][-1]):
             desiredPositions[QUACK] = positionLimits[QUACK]
         else: # short
              desiredPositions[QUACK] = -positionLimits[QUACK]
-
 
         # RW
         pattern, _ = self.rw_helper(self.data[RW])
@@ -95,6 +121,13 @@ class Algorithm():
         # sudden rise - short
         if pattern == "sudden_rise":
             desiredPositions[RW] = -positionLimits[RW]
+
+        # # PE
+        # # buy when less than avg - historically more likely to go up OR if price dropped
+        # if self.data[PE][-1] <= 8.5 or (self.day >= 2 and self.data[PE][-2] > self.data[PE][-1]):
+        #     desiredPositions[PE] = positionLimits[PE]
+        # else: # short
+        #      desiredPositions[PE] = -positionLimits[PE]
 
 
 
@@ -143,3 +176,23 @@ class Algorithm():
                     confidence = abs(Δ) / threshold
 
         return pattern, confidence
+
+
+
+    def calculate_ema(self, prices, period):
+        """Calculate Exponential Moving Average for a list of prices"""
+        # Start with simple moving average
+        sma = sum(prices[:period]) / period
+
+        # Calculate multiplier
+        multiplier = 2 / (period + 1)
+
+        # Initialize EMA with SMA
+        ema = sma
+
+        # Calculate EMA
+        for price in prices[period:]:
+            ema = price * multiplier + ema * (1 - multiplier)
+
+        return ema
+
