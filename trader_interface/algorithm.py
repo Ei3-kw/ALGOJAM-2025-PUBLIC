@@ -71,29 +71,25 @@ class Algorithm():
                 else:
                     desiredPositions[ins] = -positionLimits[ins]
 
-        # BENCH MARK 2
+        # EMA
         trade_instruments = [PE, UD]
-        ema_periods = {PE:10, UD:12}  # EMA lookback period - TODO adjust for different instruments
+        ema_periods = {PE:10, UD:12, FC:25}  # EMA lookback period - TODO adjust for different instruments
 
         # We need enough data to calculate EMA
         for ins in trade_instruments:
             ema_period = ema_periods[ins]
             if self.day >= ema_period:
-                current_price = self.data[ins][-1]
-                prices = self.data[ins][-ema_period:]
-                ema = self.calculate_ema(prices, ema_period)
-
                 # Decision logic based on price vs EMA relationship
-                if current_price < ema:  # Price below EMA - potential buy signal
+                if self.data[ins][-1] < self.calculate_ema(self.data[ins][-ema_period:], ema_period):  # Price below EMA - buy
                     desiredPositions[ins] = positionLimits[ins]
-                else:  # Price above EMA - potential sell signal
+                else:  # Price above EMA - short
                     desiredPositions[ins] = -positionLimits[ins]
 
-            # For early days when we don't have enough data for EMA
+            # For early days
             elif self.day >= 2:
                 for ins in trade_instruments:
                     # Fallback to simple price comparison strategy
-                    if self.data[ins][-2] > self.data[ins][-1]:  # if price has gone down buy
+                    if self.data[ins][-2] > self.data[ins][-1]:
                         desiredPositions[ins] = positionLimits[ins]
                     else:
                         desiredPositions[ins] = -positionLimits[ins]
