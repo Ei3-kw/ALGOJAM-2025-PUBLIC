@@ -75,7 +75,7 @@ class PerformanceAnalyzer:
         peak = np.maximum.accumulate(cumulative)
 
         # Handle division by zero - create a safe version of peak for division
-        safe_peak = np.where(peak > 0, peak, 1)  # Replace zeros with 1.0 to avoid division by zero
+        safe_peak = np.where(peak > 0, peak, 1.0)  # Replace zeros with 1.0 to avoid division by zero
         drawdown = np.where(peak > 0, (peak - cumulative) / safe_peak, 0.0)
 
         max_drawdown = np.max(drawdown) if len(drawdown) > 0 else 0

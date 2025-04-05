@@ -59,7 +59,7 @@ class Algorithm():
         # Display the current trading day
         print("Starting Algorithm for Day:", self.day)
         
-        trade_instruments = self.positionLimits.keys() - {RW, FT}
+        trade_instruments = self.positionLimits.keys() - {RW, FT, QUACK}
 
         # Display the prices of instruments I want to trade
         for ins in trade_instruments:
@@ -192,11 +192,19 @@ class Algorithm():
         #     else:
         #         desiredPositions[FT] = 0
 
+        # # FT
+        # if self.day == 0:
+        #     desiredPositions[FT] = -positionLimits[FT]
+        # elif self.day == 364:
+        #     desiredPositions[FT] = 0
+        # else:
+        #     desiredPositions[FT] = self.positions[FT]
+
 
 
         # EMA
-        trade_instruments = [PE, UD]
-        ema_periods = {PE:10, UD:12, FC:42}  # EMA lookback period - TODO adjust for different instruments
+        trade_instruments = [PE, UD, GE]
+        ema_periods = {PE:10, UD:12, FC:42, GE:14}  # EMA lookback period - TODO adjust for different instruments
 
         # We need enough data to calculate EMA
         for ins in trade_instruments:
@@ -221,17 +229,28 @@ class Algorithm():
 
         # QUACK
         if self.day >= 2:
-            if not self.QUACKick and abs(self.data[QUACK][-1]-self.data[QUACK][-2]) > 0.05:
-                self.QUACKick = 1
-                desiredPositions[QUACK] = positionLimits[QUACK] if (self.data[QUACK][-1] > self.data[QUACK][-2]) else -positionLimits[QUACK]
-                self.QUACKStart = self.day
-            elif self.QUACKick and self.day == self.QUACKStart + 22:
-                desiredPositions[QUACK] = -currentPositions[QUACK]
-            elif self.QUACKick and self.day == self.QUACKStart + 44:
-                self.QUACKick = 0
-                desiredPositions[QUACK] = 0
+            if self.QUACKick:
+                if self.day == self.QUACKStart + 22:
+                    desiredPositions[QUACK] = -currentPositions[QUACK]
+                elif self.QUACKick and self.day == self.QUACKStart + 44:
+                    self.QUACKick = 0
+                    desiredPositions[QUACK] = 0
+                else:
+                    desiredPositions[QUACK] = currentPositions[QUACK]
+
             else:
-                desiredPositions[QUACK] = currentPositions[QUACK]
+                if abs(self.data[QUACK][-1]-self.data[QUACK][-2]) > 0.05:
+                    self.QUACKick = 1
+                    desiredPositions[QUACK] = positionLimits[QUACK] if (self.data[QUACK][-1] > self.data[QUACK][-2]) else -positionLimits[QUACK]
+                    self.QUACKStart = self.day
+                else:
+                    # Fallback to simple price comparison strategy
+                    if self.data[QUACK][-2] > self.data[QUACK][-1]:
+                        desiredPositions[QUACK] = positionLimits[QUACK]
+                    else:
+                        desiredPositions[QUACK] = -positionLimits[QUACK]
+
+
 
 
 
