@@ -60,20 +60,23 @@ class Algorithm():
             print(f"{ins}: ${self.get_current_price(ins)}")
 
 
-        # BENCH MARK -- 1409403
+        # BENCH MARK -- 2039436.45
 
-        # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
-        if self.day >= 2:
-            for ins in trade_instruments:
-                # if price has gone down buy
-                if self.data[ins][-2] > self.data[ins][-1]:
-                    desiredPositions[ins] = positionLimits[ins]
-                else:
-                    desiredPositions[ins] = -positionLimits[ins]
+        # # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
+        # if self.day >= 2:
+        #     for ins in trade_instruments:
+        #         # if price has gone down buy
+        #         if self.data[ins][-2] > self.data[ins][-1]:
+        #             desiredPositions[ins] = positionLimits[ins]
+        #         else:
+        #             desiredPositions[ins] = -positionLimits[ins]
+
+
+
 
         # EMA
         trade_instruments = [PE, UD]
-        ema_periods = {PE:10, UD:12, FC:25}  # EMA lookback period - TODO adjust for different instruments
+        ema_periods = {PE:10, UD:12, FC:42}  # EMA lookback period - TODO adjust for different instruments
 
         # We need enough data to calculate EMA
         for ins in trade_instruments:
