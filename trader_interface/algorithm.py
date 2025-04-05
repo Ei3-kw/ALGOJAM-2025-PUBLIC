@@ -29,6 +29,11 @@ class Algorithm():
         self.day = 0
         # Initialise the current positions
         self.positions = positions
+
+        self.QUACKick = 0
+
+        self.QUACKStart = None
+
     # Helper function to fetch the current price of an instrument
     def get_current_price(self, instrument):
         # return most recent price
@@ -215,11 +220,21 @@ class Algorithm():
 
 
         # QUACK
-        # buy when less than avg - historically more likely to go up OR if price dropped
-        if self.data[QUACK][-1] <= 2.2 or (self.day >= 2 and self.data[QUACK][-2] > self.data[QUACK][-1]):
-            desiredPositions[QUACK] = positionLimits[QUACK]
-        else: # short
-             desiredPositions[QUACK] = -positionLimits[QUACK]
+        if self.day >= 2:
+            if not self.QUACKick and abs(self.data[QUACK][-1]-self.data[QUACK][-2]) > 0.05:
+                self.QUACKick = 1
+                desiredPositions[QUACK] = positionLimits[QUACK] if (self.data[QUACK][-1] > self.data[QUACK][-2]) else -positionLimits[QUACK]
+                self.QUACKStart = self.day
+            elif self.QUACKick and self.day == self.QUACKStart + 22:
+                desiredPositions[QUACK] = -currentPositions[QUACK]
+            elif self.QUACKick and self.day == self.QUACKStart + 44:
+                self.QUACKick = 0
+                desiredPositions[QUACK] = 0
+            else:
+                desiredPositions[QUACK] = currentPositions[QUACK]
+
+
+
 
         # RW
         pattern, _ = self.rw_helper(self.data[RW])
