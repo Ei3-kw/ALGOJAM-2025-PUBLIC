@@ -130,7 +130,7 @@ class Algorithm():
 
 
         # QUACK
-        if self.day >= 2:
+        if self.day >= 1:
             if self.QUACKick:
                 if self.day == self.QUACKStart + 22:
                     desiredPositions[QUACK] = -currentPositions[QUACK]
@@ -156,7 +156,7 @@ class Algorithm():
         pattern, _ = self.rw_helper(self.data[RW])
 
         # down slope - short
-        if self.day >= 2 and self.data[RW][-2] > self.data[RW][-1]:
+        if self.day >= 1 and self.data[RW][-2] > self.data[RW][-1]:
             desiredPositions[RW] = -positionLimits[RW]
         else: # up slope - buy
             desiredPositions[RW] = positionLimits[RW]
@@ -231,7 +231,7 @@ class Algorithm():
                     # Reduce short positions by 50%
                     desiredPositions[instrument] = currentPositions[instrument] // 2
 
-        # Handle FT trading
+        # FT
         # Check if we're in a position and need to exit
         if self.ft_exit_day is not None and self.day >= self.ft_exit_day:
             # Time to exit the position
@@ -297,10 +297,8 @@ class Algorithm():
                 print(f"Day {self.day}: SHORT FT at {self.get_current_price(FT)}")
 
         # If already in a position and not time to exit yet, maintain position
-        elif self.ft_in_long:
-            desiredPositions[FT] = positionLimits[FT]
-        elif self.ft_in_short:
-            desiredPositions[FT] = -positionLimits[FT]
+        elif self.ft_in_long or self.ft_in_short:
+            desiredPositions[FT] = currentPositions[FT]
 
 
 
