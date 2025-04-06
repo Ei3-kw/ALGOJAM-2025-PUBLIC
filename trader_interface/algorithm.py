@@ -31,8 +31,22 @@ class Algorithm():
         self.positions = positions
 
         self.QUACKick = 0
-
         self.QUACKStart = None
+
+        # regression coefficients
+        self.intercept = 1.6015
+        self.rc_coef = 0.1675
+        self.ss_coef = 0.0070
+
+        self.lookback = 5
+        self.z_threshold = .02
+
+        self.fair_values = []
+        self.z_scores = []
+        self.performance = {'day': [], 'spread': [], 'z_score': [], 'signal': []}
+
+
+
 
     # Helper function to fetch the current price of an instrument
     def get_current_price(self, instrument):
@@ -60,13 +74,14 @@ class Algorithm():
         print("Starting Algorithm for Day:", self.day)
         
         trade_instruments = self.positionLimits.keys() - {RW, FT, QUACK}
+        # trade_instruments = [RC, FC, SS]
 
         # Display the prices of instruments I want to trade
         for ins in trade_instruments:
             print(f"{ins}: ${self.get_current_price(ins)}")
 
 
-        # BENCH MARK -- 2039436.45
+        # # BENCH MARK -- 2039436.45
 
         # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
         if self.day >= 2:
@@ -76,131 +91,6 @@ class Algorithm():
                     desiredPositions[ins] = positionLimits[ins]
                 else:
                     desiredPositions[ins] = -positionLimits[ins]
-
-        # # Define moving average windows
-        # short_window = 3  # Short-term MA (5 days)
-        # long_window = 20   # Long-term MA (20 days)
-
-        # # Get historical prices for target instrument
-        # prices = np.array(self.data[RC])
-
-        # # Calculate moving averages (if we have enough data)
-        # if len(prices) >= long_window:
-        #     # Calculate short-term moving average
-        #     short_ma = np.mean(prices[-short_window:])
-
-        #     # Calculate long-term moving average
-        #     long_ma = np.mean(prices[-long_window:])
-
-        #     # Calculate volatility (safely handle return calculation)
-        #     if len(prices) >= 6:
-        #         price_today = prices[-6:]  # Last 6 days including today
-        #         price_yesterday = prices[-7:-1]  # 6 days offset by 1 (yesterday)
-        #         daily_returns = (price_today - price_yesterday) / price_yesterday
-        #         volatility = np.std(daily_returns)
-        #     else:
-        #         # If we don't have enough data for volatility calculation
-        #         volatility = 0.02  # Default volatility value
-
-        #     # Generate trend signal
-        #     if short_ma > long_ma:
-        #         signal = 1  # Bullish
-        #     else:
-        #         signal = -1  # Bearish
-
-        #     # Calculate trend strength (normalized difference between MAs relative to volatility)
-        #     ma_diff = (short_ma - long_ma) / prices[-1]  # Normalized difference
-        #     trend_strength = abs(ma_diff) / (volatility if volatility > 0 else 0.02)
-        #     trend_strength = min(trend_strength, 3)  # Cap trend strength
-
-        #     # Position sizing based on trend strength and position limit
-        #     position_limit = positionLimits[RC]
-        #     base_position = position_limit * 0.5  # Start with 50% of max position
-
-        #     if signal != 0:
-        #         position_size = base_position * (1 + trend_strength * 0.3)  # Adjust by up to 30% based on trend
-        #         position_size = signal * min(abs(position_size), position_limit)
-        #     else:
-        #         position_size = 0
-
-        #     # Set the desired position
-        #     desiredPositions[RC] = int(round(position_size))
-
-        # annual_vol_target = 0.25
-
-        # capital = 600000
-
-        # # Calculate daily volatility target
-        # daily_vol_target = annual_vol_target * capital / np.sqrt(252)
-
-        # for instrument in trade_instruments:
-        #     # Display current price
-        #     print(f"{instrument}: ${self.get_current_price(instrument)}")
-
-        #     # Skip if we don't have enough data yet (need at least 120 days)
-        #     if len(self.data[instrument]) < 69:
-        #         desiredPositions[instrument] = 0
-        #         continue
-
-        #     # Get the price history for this instrument
-        #     prices = pd.Series(self.data[instrument])
-
-        #     # Calculate fast and slow moving averages
-        #     fast_span = 20
-        #     slow_span = 120
-        #     ewma_fast = prices.ewm(span=fast_span).mean()
-        #     ewma_slow = prices.ewm(span=slow_span).mean()
-
-        #     # Calculate the raw forecast
-        #     forecast = ewma_fast - ewma_slow
-
-        #     # Normalize the forecast (centered around +/-10)
-        #     forecast_normalized = forecast * 10 / forecast.abs().mean() if forecast.abs().mean() > 0 else 0
-
-        #     # Get the most recent forecast value
-        #     current_forecast = forecast_normalized.iloc[-1]
-
-        #     # Clip the forecast to a reasonable range (-20 to 20)
-        #     current_forecast = max(min(current_forecast, 20), -20)
-
-        #     # Calculate the volatility of returns for position sizing
-        #     returns = prices.diff()
-        #     volatility = returns.ewm(span=36, min_periods=36).std().iloc[-1]
-
-        #     # Calculate position size based on volatility
-        #     if volatility > 0:
-        #         # Position = (Normalized forecast / 10) * (Daily volatility target / Volatility of instrument)
-        #         position_size = (current_forecast / 10) * (daily_vol_target / volatility)
-
-        #         # Round to integer and respect position limits
-        #         position_int = int(position_size)
-        #         position_int = max(min(position_int, positionLimits[instrument]), -positionLimits[instrument])
-
-        #         desiredPositions[instrument] = position_int
-        #     else:
-        #         # If volatility is zero, avoid division by zero
-        #         desiredPositions[instrument] = 0
-
-        # # FT
-        # if self.day > 2:
-        #     if all([self.data[FT][-1] >= self.data[FT][-2],
-        #         self.data[FT][-2] >= self.data[FT][-3]]):
-        #         desiredPositions[FT] = -positionLimits[FT]
-        #     elif all([self.data[FT][-1] <= self.data[FT][-2],
-        #         self.data[FT][-2] <= self.data[FT][-3]]):
-        #         desiredPositions[FT] = positionLimits[FT]
-        #     else:
-        #         desiredPositions[FT] = 0
-
-        # # FT
-        # if self.day == 0:
-        #     desiredPositions[FT] = -positionLimits[FT]
-        # elif self.day == 364:
-        #     desiredPositions[FT] = 0
-        # else:
-        #     desiredPositions[FT] = self.positions[FT]
-
-
 
         # EMA
         trade_instruments = [PE, UD, GE]
@@ -226,7 +116,6 @@ class Algorithm():
                         desiredPositions[ins] = -positionLimits[ins]
 
 
-
         # QUACK
         if self.day >= 2:
             if self.QUACKick:
@@ -249,11 +138,6 @@ class Algorithm():
                         desiredPositions[QUACK] = positionLimits[QUACK]
                     else:
                         desiredPositions[QUACK] = -positionLimits[QUACK]
-
-
-
-
-
 
         # RW
         pattern, _ = self.rw_helper(self.data[RW])
@@ -282,6 +166,57 @@ class Algorithm():
             desiredPositions[RW] = -positionLimits[RW]
 
 
+        # Chickens
+        fair_value = self.calculate_fair_value()
+        actual_price = self.get_current_price(FC)
+
+        # Calculate z-score
+        z_score = self.calculate_z_score(actual_price, fair_value)
+
+        # Trading logic based on z-score
+        if z_score > self.z_threshold:
+            # Fried Chicken is overpriced relative to model
+            # Go short FC, long RC and SS (weighted by coefficients)
+            self.performance['signal'].append(-1)  # Short signal
+
+            # Short FC
+            desiredPositions[FC] = -positionLimits[FC]
+
+            # Long Raw Chicken - weighted by coefficient
+            weight_rc = self.rc_coef / (self.rc_coef + self.ss_coef)
+            desiredPositions[RC] = int(positionLimits[RC] * weight_rc)
+
+            # Long Secret Spices - weighted by coefficient
+            weight_ss = self.ss_coef / (self.rc_coef + self.ss_coef)
+            desiredPositions[SS] = int(positionLimits[SS] * weight_ss)
+
+        elif z_score < -self.z_threshold:
+            # Fried Chicken is underpriced relative to model
+            # Go long FC, short RC and SS (weighted by coefficients)
+            self.performance['signal'].append(1)  # Long signal
+
+            # Long FC
+            desiredPositions[FC] = positionLimits[FC]
+
+            # Short Raw Chicken - weighted by coefficient
+            weight_rc = self.rc_coef / (self.rc_coef + self.ss_coef)
+            desiredPositions[RC] = -int(positionLimits[RC] * weight_rc)
+
+            # Short Secret Spices - weighted by coefficient
+            weight_ss = self.ss_coef / (self.rc_coef + self.ss_coef)
+            desiredPositions[SS] = -int(positionLimits[SS] * weight_ss)
+        else:
+            # No clear signal, stay neutral or unwind positions
+            self.performance['signal'].append(0)  # Neutral signal
+
+            # If we have existing positions, consider unwinding them gradually
+            for instrument in [FC, RC, SS]:
+                if currentPositions.get(instrument, 0) > 0:
+                    # Reduce long positions by 50%
+                    desiredPositions[instrument] = currentPositions[instrument] // 2
+                elif currentPositions.get(instrument, 0) < 0:
+                    # Reduce short positions by 50%
+                    desiredPositions[instrument] = currentPositions[instrument] // 2
 
 
 
@@ -291,6 +226,51 @@ class Algorithm():
         #######################################################################
         # Return the desired positions
         return desiredPositions
+
+    # Calculate fair value of Fried Chicken based on regression model
+    def calculate_fair_value(self):
+        rc_price = self.get_current_price(RC)
+        ss_price = self.get_current_price(SS)
+        fair_value = self.intercept + (self.rc_coef * rc_price) + (self.ss_coef * ss_price)
+        return fair_value
+
+    # Calculate z-score for the spread between actual and fair value
+    def calculate_z_score(self, actual_price, fair_value):
+        # Need enough history to calculate meaningful z-scores
+        if len(self.fair_values) < self.lookback:
+            self.fair_values.append(fair_value)
+            return 0
+
+        self.fair_values.append(fair_value)
+        # Keep only the most recent lookback period
+        if len(self.fair_values) > self.lookback * 2:
+            self.fair_values = self.fair_values[-self.lookback*2:]
+
+        # Calculate spread between actual and fair value
+        spread = actual_price - fair_value
+
+        # Calculate recent spreads
+        recent_spreads = [self.data[FC][-(i+1)] - self.fair_values[-(i+1)]
+                         for i in range(min(self.lookback, len(self.fair_values)-1))]
+
+        # Calculate mean and standard deviation of recent spreads
+        mean_spread = np.mean(recent_spreads)
+        std_spread = np.std(recent_spreads)
+
+        # Avoid division by zero
+        if std_spread == 0:
+            return 0
+
+        # Calculate z-score
+        z_score = (spread - mean_spread) / std_spread
+        self.z_scores.append(z_score)
+
+        # Track performance metrics
+        self.performance['day'].append(self.day)
+        self.performance['spread'].append(spread)
+        self.performance['z_score'].append(z_score)
+
+        return z_score
 
 
     def rw_helper(self, prices, window_size=5, threshold=4):
