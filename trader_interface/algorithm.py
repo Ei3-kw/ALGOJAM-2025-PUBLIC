@@ -93,7 +93,7 @@ class Algorithm():
 
         # EMA
         trade_instruments = [PE, UD, GE, DF]
-        ema_periods = {PE:10, UD:12, FC:42, GE:14, DF:6}  # EMA lookback period - TODO adjust for different instruments
+        ema_periods = {PE:8, UD:12, FC:42, GE:14, DF:6}  # EMA lookback period - TODO adjust for different instruments
 
         # We need enough data to calculate EMA
         for ins in trade_instruments:
