@@ -47,6 +47,20 @@ class Algorithm():
         self.performance = {'day': [], 'spread': [], 'z_score': [], 'signal': []}
 
 
+        # FT trading parameters (these will be tuned)
+        self.trend_window = 7       # Window size for trend detection
+        self.slope_threshold = 0.025# Threshold to determine significant trend
+        self.x_days = 5             # Hold period for long positions
+        self.y_days = 5             # Hold period for short positions
+
+        # FT trading state variables
+        self.ft_entry_day = None    # Day when position was entered
+        self.ft_exit_day = None     # Planned exit day
+        self.ft_in_long = False     # Flag for long position
+        self.ft_in_short = False    # Flag for short position
+        self.ft_trades = []         # Track trades for analysis
+
+
     # Helper function to fetch the current price of an instrument
     def get_current_price(self, instrument):
         # return most recent price
@@ -92,8 +106,8 @@ class Algorithm():
                     desiredPositions[ins] = -positionLimits[ins]
 
         # EMA
-        trade_instruments = [PE, UD, GE, DF]
-        ema_periods = {PE:8, UD:12, FC:42, GE:14, DF:6}  # EMA lookback period - TODO adjust for different instruments
+        trade_instruments = [PE, UD, GE, DF, FT]
+        ema_periods = {PE:8, UD:12, FC:42, GE:14, DF:6, FT:5}  # EMA lookback period - TODO adjust for different instruments
 
         # We need enough data to calculate EMA
         for ins in trade_instruments:
@@ -217,6 +231,76 @@ class Algorithm():
                     # Reduce short positions by 50%
                     desiredPositions[instrument] = currentPositions[instrument] // 2
 
+        # Handle FT trading
+        # Check if we're in a position and need to exit
+        if self.ft_exit_day is not None and self.day >= self.ft_exit_day:
+            # Time to exit the position
+            if self.ft_in_long or self.ft_in_short:
+                # Exit by setting position to zero
+                desiredPositions[FT] = 0
+
+                # Log the trade
+                trade_type = "SELL" if self.ft_in_long else "COVER_SHORT"
+                self.ft_trades.append({
+                    'day': self.day,
+                    'type': trade_type,
+                    'price': self.get_current_price(FT)
+                })
+
+                # Reset trading state
+                self.ft_in_long = False
+                self.ft_in_short = False
+                self.ft_entry_day = None
+                self.ft_exit_day = None
+
+                print(f"Day {self.day}: {trade_type} FT at {self.get_current_price(FT)}")
+
+        # If not in a position, check for new entry signals
+        elif not self.ft_in_long and not self.ft_in_short:
+            # Get current trend
+            trend = self.detect_trend(FT)
+
+            if trend == 1:  # Uptrend - go long
+                # Buy maximum allowed
+                desiredPositions[FT] = positionLimits[FT]
+
+                # Set trading state
+                self.ft_in_long = True
+                self.ft_entry_day = self.day
+                self.ft_exit_day = self.day + self.x_days
+
+                # Log the trade
+                self.ft_trades.append({
+                    'day': self.day,
+                    'type': "BUY",
+                    'price': self.get_current_price(FT)
+                })
+
+                print(f"Day {self.day}: BUY FT at {self.get_current_price(FT)}")
+
+            elif trend == -1:  # Downtrend - go short
+                # Short maximum allowed
+                desiredPositions[FT] = -positionLimits[FT]
+
+                # Set trading state
+                self.ft_in_short = True
+                self.ft_entry_day = self.day
+                self.ft_exit_day = self.day + self.y_days
+
+                # Log the trade
+                self.ft_trades.append({
+                    'day': self.day,
+                    'type': "SHORT",
+                    'price': self.get_current_price(FT)
+                })
+
+                print(f"Day {self.day}: SHORT FT at {self.get_current_price(FT)}")
+
+        # If already in a position and not time to exit yet, maintain position
+        elif self.ft_in_long:
+            desiredPositions[FT] = positionLimits[FT]
+        elif self.ft_in_short:
+            desiredPositions[FT] = -positionLimits[FT]
 
 
 
@@ -225,6 +309,65 @@ class Algorithm():
         #######################################################################
         # Return the desired positions
         return desiredPositions
+
+
+    def detect_trend(self, instrument):
+        """
+        Detect price trend using moving average slope
+        Returns: 1 for uptrend, -1 for downtrend, 0 for sideways
+        """
+        if instrument not in self.data or len(self.data[instrument]) < self.trend_window:
+            return 0  # Not enough data
+
+        # Get recent prices
+        prices = self.data[instrument]
+
+        # Calculate moving average
+        ma_window = min(self.trend_window, len(prices))
+        if ma_window < 10:  # Need minimum data points
+            return 0
+
+        ma = []
+        for i in range(ma_window):
+            start_idx = len(prices) - ma_window + i - ma_window + 1
+            if start_idx < 0:
+                continue
+            window_slice = prices[start_idx:len(prices) - ma_window + i + 1]
+            if window_slice:
+                ma.append(sum(window_slice) / len(window_slice))
+
+        if len(ma) < ma_window // 2:
+            return 0  # Not enough points for trend
+
+        # Calculate slope using linear regression
+        x = np.array(range(len(ma)))
+        y = np.array(ma)
+
+        # Linear regression: y = mx + b
+        n = len(x)
+        if n < 2:
+            return 0
+
+        sum_x = np.sum(x)
+        sum_y = np.sum(y)
+        sum_xy = np.sum(x * y)
+        sum_xx = np.sum(x * x)
+
+        # Calculate slope
+        slope = (n * sum_xy - sum_x * sum_y) / (n * sum_xx - sum_x * sum_x)
+
+        # Normalize slope as percentage of current price
+        current_price = prices[-1]
+        if current_price != 0:  # Avoid division by zero
+            normalized_slope = slope / current_price
+
+            if normalized_slope > self.slope_threshold:
+                return 1  # Uptrend
+            elif normalized_slope < -self.slope_threshold:
+                return -1  # Downtrend
+
+        return 0  # Sideways/no clear trend
+
 
     # Calculate fair value of Fried Chicken based on regression model
     def calculate_fair_value(self):
