@@ -48,7 +48,7 @@ class Algorithm():
 
 
         # FT trading parameters (these will be tuned)
-        self.trend_window = 7       # Window size for trend detection
+        self.trend_window = 8       # Window size for trend detection
         self.slope_threshold = 0.025# Threshold to determine significant trend
         self.x_days = 5             # Hold period for long positions
         self.y_days = 5             # Hold period for short positions
@@ -97,7 +97,7 @@ class Algorithm():
         # BENCH MARK -- 2039436.45
 
         # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
-        if self.day >= 2:
+        if self.day >= 1:
             for ins in trade_instruments:
                 # if price has gone down buy
                 if self.data[ins][-2] > self.data[ins][-1]:
