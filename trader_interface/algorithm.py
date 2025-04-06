@@ -120,7 +120,7 @@ class Algorithm():
                     desiredPositions[ins] = -positionLimits[ins]
 
             # For early days
-            elif self.day >= 4:
+            elif self.day >= 5:
                 for ins in trade_instruments:
                     # Fallback to simple price comparison strategy
                     if self.data[ins][-2] > self.data[ins][-1]:
