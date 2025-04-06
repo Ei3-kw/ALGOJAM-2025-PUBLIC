@@ -38,13 +38,29 @@ class Algorithm():
         self.rc_coef = 0.1675
         self.ss_coef = 0.0070
 
+        # Generic parameters (placeholder - these are now split into specific ones)
         self.lookback = 5
-        self.z_threshold_short = .085
-        self.z_threshold_long = .015
+        self.z_threshold_short = 0.02
+        self.z_threshold_long = 0.02
 
+        # Specific threshold parameters for different spread relationships
+        # RC-FC relationship thresholds
+        self.z_threshold_short_rc = 0.02  # For shorts when RC-FC spread is positive
+        self.z_threshold_long_rc = 0.01   # For longs when RC-FC spread is negative
+
+        # SS-FC relationship thresholds
+        self.z_threshold_short_ss = 0.03  # For shorts when SS-FC spread is positive
+        self.z_threshold_long_ss = 0.02   # For longs when SS-FC spread is negative
+
+        # Performance tracking
         self.fair_values = []
         self.z_scores = []
         self.performance = {'day': [], 'spread': [], 'z_score': [], 'signal': []}
+
+        # Separate tracking for individual relationships
+        self.rc_performance = {'day': [], 'spread': [], 'z_score': [], 'signal': []}
+        self.ss_performance = {'day': [], 'spread': [], 'z_score': [], 'signal': []}
+
 
 
     # Helper function to fetch the current price of an instrument
@@ -92,8 +108,8 @@ class Algorithm():
                     desiredPositions[ins] = -positionLimits[ins]
 
         # EMA
-        trade_instruments = [PE, UD, GE, DF]
-        ema_periods = {PE:10, UD:12, FC:42, GE:14, DF:6}  # EMA lookback period - TODO adjust for different instruments
+        trade_instruments = [PE, UD, GE]
+        ema_periods = {PE:10, UD:12, FC:42, GE:14}  # EMA lookback period - TODO adjust for different instruments
 
         # We need enough data to calculate EMA
         for ins in trade_instruments:
@@ -166,18 +182,87 @@ class Algorithm():
 
 
         # Chickens
+        # Calculate fair values for both relationships
+        fair_value_rc = self.calculate_fair_value_rc()
+        fair_value_ss = self.calculate_fair_value_ss()
+
+        # Combined fair value (weighted average)
         fair_value = self.calculate_fair_value()
+
+        # Get current price of FC
         actual_price = self.get_current_price(FC)
 
-        # Calculate z-score
+        # Calculate spreads
+        spread_rc = actual_price - fair_value_rc
+        spread_ss = actual_price - fair_value_ss
+        spread = actual_price - fair_value
+
+        # Update performance tracking for combined model
+        self.performance['day'].append(self.day)
+        self.performance['spread'].append(spread)
+
+        # Update performance tracking for individual relationships
+        self.rc_performance['day'].append(self.day)
+        self.rc_performance['spread'].append(spread_rc)
+
+        self.ss_performance['day'].append(self.day)
+        self.ss_performance['spread'].append(spread_ss)
+
+        # Calculate z-scores for each relationship
+        z_score_rc = self.calculate_z_score(actual_price, fair_value_rc, self.rc_performance)
+        z_score_ss = self.calculate_z_score(actual_price, fair_value_ss, self.ss_performance)
+
+        # Calculate combined z-score
         z_score = self.calculate_z_score(actual_price, fair_value)
 
-        # Trading logic based on z-score
-        if z_score > self.z_threshold_short:
-            # Fried Chicken is overpriced relative to model
-            # Go short FC, long RC and SS (weighted by coefficients)
-            self.performance['signal'].append(-1)  # Short signal
+        self.performance['z_score'].append(z_score)
+        self.rc_performance['z_score'].append(z_score_rc)
+        self.ss_performance['z_score'].append(z_score_ss)
 
+        # Combined signal based on both relationships
+        # If both relationships suggest the same direction, take that signal
+        # If they conflict, use the stronger signal (higher absolute z-score)
+
+        # RC relationship signal
+        rc_signal = 0
+        if z_score_rc > self.z_threshold_short_rc:
+            rc_signal = -1  # Short signal
+        elif z_score_rc < -self.z_threshold_long_rc:
+            rc_signal = 1   # Long signal
+
+        # SS relationship signal
+        ss_signal = 0
+        if z_score_ss > self.z_threshold_short_ss:
+            ss_signal = -1  # Short signal
+        elif z_score_ss < -self.z_threshold_long_ss:
+            ss_signal = 1   # Long signal
+
+        # Record individual signals
+        self.rc_performance['signal'].append(rc_signal)
+        self.ss_performance['signal'].append(ss_signal)
+
+        # Determine combined signal
+        signal = 0
+
+        # If both agree, use that signal
+        if rc_signal == ss_signal and rc_signal != 0:
+            signal = rc_signal
+        # If they disagree, use the one with stronger conviction (higher abs z-score)
+        elif rc_signal != 0 and ss_signal != 0:
+            if abs(z_score_rc) > abs(z_score_ss):
+                signal = rc_signal
+            else:
+                signal = ss_signal
+        # If only one has a signal, use that
+        elif rc_signal != 0:
+            signal = rc_signal
+        elif ss_signal != 0:
+            signal = ss_signal
+
+        self.performance['signal'].append(signal)
+
+        # Trading logic based on combined signal
+        if signal == -1:  # Short signal
             # Short FC
             desiredPositions[FC] = -positionLimits[FC]
 
@@ -189,11 +274,7 @@ class Algorithm():
             weight_ss = self.ss_coef / (self.rc_coef + self.ss_coef)
             desiredPositions[SS] = int(positionLimits[SS] * weight_ss)
 
-        elif z_score < -self.z_threshold_long:
-            # Fried Chicken is underpriced relative to model
-            # Go long FC, short RC and SS (weighted by coefficients)
-            self.performance['signal'].append(1)  # Long signal
-
+        elif signal == 1:  # Long signal
             # Long FC
             desiredPositions[FC] = positionLimits[FC]
 
@@ -204,10 +285,8 @@ class Algorithm():
             # Short Secret Spices - weighted by coefficient
             weight_ss = self.ss_coef / (self.rc_coef + self.ss_coef)
             desiredPositions[SS] = -int(positionLimits[SS] * weight_ss)
-        else:
-            # No clear signal, stay neutral or unwind positions
-            self.performance['signal'].append(0)  # Neutral signal
 
+        else:  # Neutral signal
             # If we have existing positions, consider unwinding them gradually
             for instrument in [FC, RC, SS]:
                 if currentPositions.get(instrument, 0) > 0:
@@ -218,58 +297,65 @@ class Algorithm():
                     desiredPositions[instrument] = currentPositions[instrument] // 2
 
 
-
-
         # Display the end of trading day
         print("Ending Algorithm for Day:", self.day, "\n")
         #######################################################################
         # Return the desired positions
         return desiredPositions
 
-    # Calculate fair value of Fried Chicken based on regression model
-    def calculate_fair_value(self):
-        rc_price = self.get_current_price(RC)
-        ss_price = self.get_current_price(SS)
-        fair_value = self.intercept + (self.rc_coef * rc_price) + (self.ss_coef * ss_price)
-        return fair_value
+    # Helper function to fetch the current price of an instrument
+    def get_current_price(self, instrument):
+        # return most recent price
+        return self.data[instrument][-1]
 
-    # Calculate z-score for the spread between actual and fair value
-    def calculate_z_score(self, actual_price, fair_value):
-        # Need enough history to calculate meaningful z-scores
-        if len(self.fair_values) < self.lookback:
-            self.fair_values.append(fair_value)
+    # Calculate fair value based on RC relationship
+    def calculate_fair_value_rc(self):
+        rc_price = self.get_current_price("Raw Chicken")
+        return self.intercept + self.rc_coef * rc_price
+
+    # Calculate fair value based on SS relationship
+    def calculate_fair_value_ss(self):
+        ss_price = self.get_current_price("Secret Spices")
+        return self.intercept + self.ss_coef * ss_price
+
+    # Combined fair value calculation (weighted average of both relationships)
+    def calculate_fair_value(self):
+        rc_fair_value = self.calculate_fair_value_rc()
+        ss_fair_value = self.calculate_fair_value_ss()
+
+        # Weight by coefficient magnitude (more weight to stronger relationship)
+        total_coef = abs(self.rc_coef) + abs(self.ss_coef)
+        weight_rc = abs(self.rc_coef) / total_coef
+        weight_ss = abs(self.ss_coef) / total_coef
+
+        return weight_rc * rc_fair_value + weight_ss * ss_fair_value
+
+    # Calculate z-score using lookback period
+    def calculate_z_score(self, actual, fair_value, performance_data=None):
+        # Use main performance data if none specified
+        if performance_data is None:
+            performance_data = self.performance
+
+        # Calculate spread
+        spread = actual - fair_value
+
+        # If not enough history, return 0
+        if len(performance_data['spread']) < self.lookback:
             return 0
 
-        self.fair_values.append(fair_value)
-        # Keep only the most recent lookback period
-        if len(self.fair_values) > self.lookback * 2:
-            self.fair_values = self.fair_values[-self.lookback*2:]
+        # Calculate z-score based on recent spread history
+        recent_spreads = performance_data['spread'][-self.lookback:]
+        mean_spread = sum(recent_spreads) / len(recent_spreads)
 
-        # Calculate spread between actual and fair value
-        spread = actual_price - fair_value
-
-        # Calculate recent spreads
-        recent_spreads = [self.data[FC][-(i+1)] - self.fair_values[-(i+1)]
-                         for i in range(min(self.lookback, len(self.fair_values)-1))]
-
-        # Calculate mean and standard deviation of recent spreads
-        mean_spread = np.mean(recent_spreads)
-        std_spread = np.std(recent_spreads)
+        # Calculate standard deviation
+        variance = sum((s - mean_spread) ** 2 for s in recent_spreads) / len(recent_spreads)
+        std_spread = variance ** 0.5
 
         # Avoid division by zero
         if std_spread == 0:
             return 0
 
-        # Calculate z-score
-        z_score = (spread - mean_spread) / std_spread
-        self.z_scores.append(z_score)
-
-        # Track performance metrics
-        self.performance['day'].append(self.day)
-        self.performance['spread'].append(spread)
-        self.performance['z_score'].append(z_score)
-
-        return z_score
+        return (spread - mean_spread) / std_spread
 
 
     def rw_helper(self, prices, window_size=5, threshold=4):
