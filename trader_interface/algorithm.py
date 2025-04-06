@@ -39,7 +39,8 @@ class Algorithm():
         self.ss_coef = 0.0070
 
         self.lookback = 5
-        self.z_threshold = .02
+        self.z_threshold_short = .085
+        self.z_threshold_long = .015
 
         self.fair_values = []
         self.z_scores = []
@@ -81,7 +82,7 @@ class Algorithm():
             print(f"{ins}: ${self.get_current_price(ins)}")
 
 
-        # # BENCH MARK -- 2039436.45
+        # BENCH MARK -- 2039436.45
 
         # Start trading from Day 2 onwards. Buy if price dropped and sell if price rose compared to the previous day
         if self.day >= 2:
@@ -174,7 +175,7 @@ class Algorithm():
         z_score = self.calculate_z_score(actual_price, fair_value)
 
         # Trading logic based on z-score
-        if z_score > self.z_threshold:
+        if z_score > self.z_threshold_short:
             # Fried Chicken is overpriced relative to model
             # Go short FC, long RC and SS (weighted by coefficients)
             self.performance['signal'].append(-1)  # Short signal
@@ -190,7 +191,7 @@ class Algorithm():
             weight_ss = self.ss_coef / (self.rc_coef + self.ss_coef)
             desiredPositions[SS] = int(positionLimits[SS] * weight_ss)
 
-        elif z_score < -self.z_threshold:
+        elif z_score < -self.z_threshold_long:
             # Fried Chicken is underpriced relative to model
             # Go long FC, short RC and SS (weighted by coefficients)
             self.performance['signal'].append(1)  # Long signal

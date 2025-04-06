@@ -1,2 +1,5 @@
 **/.DS_Store
 *.pyc
+/trader_interface/optimization_results
+trader_interface/parameter_optimization_interim_results.csv
+trader_interface/parameter_optimization_results.csv
